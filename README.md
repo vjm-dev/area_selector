@@ -23,7 +23,7 @@ Add this package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  area_selector:
+  area_selector: ^0.2.0
 ```
 
 Then run:
@@ -62,7 +62,7 @@ class MyWidget extends StatelessWidget {
 
 - Multi-Area Example:
 ```dart
-import 'package:area_selector/multi-area_selector.dart';
+import 'package:area_selector/multi_area_selector.dart';
 
 class MyWidget extends StatelessWidget {
   @override
