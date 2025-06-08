@@ -19,16 +19,6 @@ void main() {
                 borderColor: Colors.red,
                 onChanged: (_) {},
               ),
-              MultiAreaSelector(
-                initialRects: const [
-                  Rect.fromLTWH(40, 40, 120, 100),
-                  Rect.fromLTWH(200, 150, 160, 120),
-                ],
-                gridSize: 30,
-                aspectRatio: 15,
-                borderColor: Colors.green,
-                onChanged: (rects) => ("anything does"), //print('Updated regions: $rects'),
-              ),
             ],
           ),
         ),
@@ -75,5 +65,87 @@ void main() {
 
     expect(updatedRect.left, initialRect.left + 20);
     expect(updatedRect.top, initialRect.top + 30);
+  });
+
+  testWidgets('MultiAreaSelector renders multiple regions at correct initial positions', (tester) async {
+    const rect1 = Rect.fromLTWH(20, 30, 100, 80);
+    const rect2 = Rect.fromLTWH(120, 130, 150, 120);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MultiAreaSelector(
+            initialRects: const [
+              rect1,
+              rect2
+            ],
+            gridSize: 30,
+            aspectRatio: 2.0,
+            borderColor: Colors.green,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    final positionedRects = tester.widgetList<Positioned>(find.byType(Positioned)).toList();
+    final mainRects = positionedRects.where((p) => p.width! > 50 && p.height! > 50).toList();
+
+    expect(mainRects.length, 2);
+
+    expect(mainRects[0].left, rect1.left);
+    expect(mainRects[0].top, rect1.top);
+    expect(mainRects[0].width, rect1.width);
+    expect(mainRects[0].height, rect1.height);
+
+    expect(mainRects[1].left, rect2.left);
+    expect(mainRects[1].top, rect2.top);
+    expect(mainRects[1].width, rect2.width);
+    expect(mainRects[1].height, rect2.height);
+  });
+
+  testWidgets('MultiAreaSelector calls onChanged with updated rects on drag', (tester) async {
+    const rect1 = Rect.fromLTWH(0, 0, 100, 80);
+    const rect2 = Rect.fromLTWH(50, 50, 120, 90);
+
+    List<List<Rect>> callbackValues = [];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MultiAreaSelector(
+            initialRects: const [
+              rect1,
+              rect2
+            ],
+            gridSize: 0, // disable snapping for simpler behavior
+            aspectRatio: null, // disable aspect lock
+            borderColor: Colors.green,
+            onChanged: (newRects) {
+              callbackValues.add(newRects);
+            },
+          ),
+        ),
+      ),
+    );
+
+    final firstRegion = find.descendant(
+      of: find.byType(AreaSelector).at(0),
+      matching: find.byType(Container),
+    ).first;
+
+    await tester.drag(firstRegion, const Offset(20, 30));
+    await tester.pump();
+
+    expect(callbackValues.isNotEmpty, true);
+    
+    final lastRects = callbackValues.last;
+    expect(lastRects.length, 2);
+    expect(lastRects[0].left, rect1.left + 20);
+    expect(lastRects[0].top, rect1.top + 30);
+    
+    // The second rect should remain unchanged
+    expect(lastRects[1].left, rect2.left);
+    expect(lastRects[1].top, rect2.top);
   });
 }
