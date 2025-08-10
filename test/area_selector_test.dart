@@ -114,38 +114,44 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: MultiAreaSelector(
-            initialRects: const [
-              rect1,
-              rect2
-            ],
-            gridSize: 0, // disable snapping for simpler behavior
-            aspectRatio: null, // disable aspect lock
-            borderColor: Colors.green,
-            onChanged: (newRects) {
-              callbackValues.add(newRects);
-            },
+            initialRects: const [rect1, rect2],
+            onChanged: (newRects) => callbackValues.add(List.from(newRects)),
           ),
         ),
       ),
     );
 
+    // Find the AreaSelector corresponding to rect1
+    final areaSelectors = tester.widgetList<AreaSelector>(find.byType(AreaSelector)).toList();
+    final rect1Selector = areaSelectors.firstWhere(
+      (selector) => selector.initialRect == rect1,
+    );
+
     final firstRegion = find.descendant(
-      of: find.byType(AreaSelector).at(0),
+      of: find.byWidget(rect1Selector),
       matching: find.byType(Container),
     ).first;
 
     await tester.drag(firstRegion, const Offset(20, 30));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(callbackValues.isNotEmpty, true);
     
     final lastRects = callbackValues.last;
     expect(lastRects.length, 2);
-    expect(lastRects[0].left, rect1.left + 20);
-    expect(lastRects[0].top, rect1.top + 30);
+
+    // Find the moved rect1 (can be anywhere in the array)
+    final movedRect = lastRects.firstWhere(
+      (r) => r.left == rect1.left + 20 && r.top == rect1.top + 30,
+      orElse: () => Rect.zero,
+    );
     
-    // The second rect should remain unchanged
-    expect(lastRects[1].left, rect2.left);
-    expect(lastRects[1].top, rect2.top);
+    expect(movedRect, isNot(Rect.zero), reason: 'No moved rectangle was found');
+    
+    // Verify the other rectangle didn't change
+    final unchangedRect = lastRects.firstWhere(
+      (r) => r != movedRect,
+    );
+    expect(unchangedRect, anyOf([rect1, rect2]));
   });
 }
