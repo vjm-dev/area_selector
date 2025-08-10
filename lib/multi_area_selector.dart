@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
 import 'area_selector.dart';
 
 class MultiAreaSelector extends StatefulWidget {
@@ -26,11 +26,26 @@ class MultiAreaSelector extends StatefulWidget {
 
 class _MultiAreaSelectorState extends State<MultiAreaSelector> {
   late List<Rect> rects;
+  late List<int> _order;
 
   @override
   void initState() {
     super.initState();
     rects = List.from(widget.initialRects);
+    _order = List.generate(rects.length, (i) => i);
+  }
+
+  @override
+  void didUpdateWidget(MultiAreaSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(widget.initialRects, oldWidget.initialRects)) {
+      setState(() {
+        rects = List.from(widget.initialRects);
+        if (rects.length != _order.length) {
+          _order = List.generate(rects.length, (i) => i);
+        }
+      });
+    }
   }
 
   void _updateRect(int index, Rect newRect) {
@@ -40,19 +55,32 @@ class _MultiAreaSelectorState extends State<MultiAreaSelector> {
     });
   }
 
+  void _bringToFront(int index) {
+    setState(() {
+      _order.remove(index);
+      _order.add(index);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        for (int i = 0; i < rects.length; i++)
+        for (int i = 0; i < _order.length; i++)
           AreaSelector(
-            key: ValueKey('selector_$i'),
-            initialRect: rects[i],
+            key: ValueKey(_order[i]),
+            initialRect: rects[_order[i]],
             aspectRatio: widget.aspectRatio,
             gridSize: widget.gridSize,
             handleSize: widget.handleSize,
             borderColor: widget.borderColor,
-            onChanged: (r) => _updateRect(i, r),
+            onChanged: (r) => _updateRect(_order[i], r),
+            onDragStart: () {
+              if (_order.last != _order[i]) {
+                _bringToFront(_order[i]);
+              }
+            },
+            onDragEnd: () => widget.onChanged?.call(List.unmodifiable(rects)),
           ),
       ],
     );

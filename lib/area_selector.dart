@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 class AreaSelector extends StatefulWidget {
   final Rect initialRect;
   final void Function(Rect)? onChanged;
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDragEnd;
   final double? aspectRatio;
   final double? gridSize;
   final double handleSize;
@@ -12,6 +14,8 @@ class AreaSelector extends StatefulWidget {
     Key? key,
     required this.initialRect,
     this.onChanged,
+    this.onDragStart,
+    this.onDragEnd,
     this.aspectRatio,
     this.gridSize,
     this.handleSize = 16.0,
@@ -31,6 +35,14 @@ class _AreaSelectorState extends State<AreaSelector> {
   void initState() {
     super.initState();
     rect = widget.initialRect;
+  }
+
+  @override
+  void didUpdateWidget(AreaSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialRect != oldWidget.initialRect) {
+      rect = widget.initialRect;
+    }
   }
 
   @override
@@ -73,6 +85,7 @@ class _AreaSelectorState extends State<AreaSelector> {
           onPanStart: (_) {
             activeHandle = _handleFromPosition(e.key);
             dragStart = e.value;
+            widget.onDragStart?.call();
           },
           onPanUpdate: (d) {
             _resize(e.key, d.delta);
@@ -93,24 +106,25 @@ class _AreaSelectorState extends State<AreaSelector> {
   void _onDragStart(DragStartDetails details) {
     activeHandle = DragHandle.move;
     dragStart = details.globalPosition;
+    widget.onDragStart?.call();
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (activeHandle == DragHandle.move) {
       setState(() {
-        Offset newTopLeft = rect.topLeft + details.delta;
-
-        // Apply snapping if grid is set
-        final width = rect.width;
-        final height = rect.height;
+        final newTopLeft = rect.topLeft + details.delta;
         final newLeft = _snap(newTopLeft.dx);
         final newTop = _snap(newTopLeft.dy);
 
-        rect = Rect.fromLTWH(newLeft, newTop, width, height);
+        rect = Rect.fromLTWH(
+          newLeft,
+          newTop,
+          rect.width,
+          rect.height,
+        );
         widget.onChanged?.call(rect);
       });
     }
-    // handle resizing in onPanUpdate inside handle widgets
   }
 
   double _snap(double value) {
@@ -121,12 +135,15 @@ class _AreaSelectorState extends State<AreaSelector> {
 
   void _resize(_HandlePos pos, Offset delta) {
     setState(() {
-      double left = rect.left, top = rect.top, right = rect.right, bottom = rect.bottom;
+      double left = rect.left;
+      double top = rect.top;
+      double right = rect.right;
+      double bottom = rect.bottom;
 
       switch (pos) {
         case _HandlePos.topLeft:
-          left += delta.dx;
-          top += delta.dy;
+          left = (left + delta.dx).clamp(0, right - 1);
+          top = (top + delta.dy).clamp(0, bottom - 1);
           if (widget.aspectRatio != null) {
             final width = right - left;
             final height = width / widget.aspectRatio!;
@@ -134,8 +151,8 @@ class _AreaSelectorState extends State<AreaSelector> {
           }
           break;
         case _HandlePos.topRight:
-          right += delta.dx;
-          top += delta.dy;
+          right = (right + delta.dx).clamp(left + 1, double.infinity);
+          top = (top + delta.dy).clamp(0, bottom - 1);
           if (widget.aspectRatio != null) {
             final width = right - left;
             final height = width / widget.aspectRatio!;
@@ -143,8 +160,8 @@ class _AreaSelectorState extends State<AreaSelector> {
           }
           break;
         case _HandlePos.bottomLeft:
-          left += delta.dx;
-          bottom += delta.dy;
+          left = (left + delta.dx).clamp(0, right - 1);
+          bottom = (bottom + delta.dy).clamp(top + 1, double.infinity);
           if (widget.aspectRatio != null) {
             final width = right - left;
             final height = width / widget.aspectRatio!;
@@ -152,8 +169,8 @@ class _AreaSelectorState extends State<AreaSelector> {
           }
           break;
         case _HandlePos.bottomRight:
-          right += delta.dx;
-          bottom += delta.dy;
+          right = (right + delta.dx).clamp(left + 1, double.infinity);
+          bottom = (bottom + delta.dy).clamp(top + 1, double.infinity);
           if (widget.aspectRatio != null) {
             final width = right - left;
             final height = width / widget.aspectRatio!;
@@ -162,31 +179,20 @@ class _AreaSelectorState extends State<AreaSelector> {
           break;
       }
 
-      // Snap to grid if enabled
-      left = _snap(left);
-      top = _snap(top);
-      right = _snap(right);
-      bottom = _snap(bottom);
-
-      // Ensure valid rect
-      if (left > right) {
-        final temp = left;
-        left = right;
-        right = temp;
-      }
-      if (top > bottom) {
-        final temp = top;
-        top = bottom;
-        bottom = temp;
-      }
-
-      rect = Rect.fromLTRB(left, top, right, bottom);
+      // Snap an make sure the rectangle is valid
+      rect = Rect.fromLTRB(
+        _snap(left),
+        _snap(top),
+        _snap(right),
+        _snap(bottom),
+      );
     });
   }
 
   void _endDrag() {
     activeHandle = null;
     dragStart = null;
+    widget.onDragEnd?.call();
   }
 }
 
@@ -195,13 +201,9 @@ enum _HandlePos { topLeft, topRight, bottomLeft, bottomRight }
 
 DragHandle _handleFromPosition(_HandlePos pos) {
   switch (pos) {
-    case _HandlePos.topLeft:
-      return DragHandle.topLeft;
-    case _HandlePos.topRight:
-      return DragHandle.topRight;
-    case _HandlePos.bottomLeft:
-      return DragHandle.bottomLeft;
-    case _HandlePos.bottomRight:
-      return DragHandle.bottomRight;
+    case _HandlePos.topLeft: return DragHandle.topLeft;
+    case _HandlePos.topRight: return DragHandle.topRight;
+    case _HandlePos.bottomLeft: return DragHandle.bottomLeft;
+    case _HandlePos.bottomRight: return DragHandle.bottomRight;
   }
 }
